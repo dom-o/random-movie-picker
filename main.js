@@ -1,3 +1,12 @@
+function toggleVisibility(id) {
+  var e = document.getElementById(id);
+  if(e.style.display == 'block') {
+    e.style.display = 'none';
+  } else {
+    e.style.display = 'block';
+  }
+}
+
 function injectMovie(movie, errorText) {
   var movieDiv = document.getElementById('movie-info');
 
@@ -5,7 +14,8 @@ function injectMovie(movie, errorText) {
     '<img id="movie-poster" src="' + movie.images[0].url + '"' +
       'alt="Poster for ' + movie.title + ' (' + movie.year + ')" height="250" width="167"/>' +
     '<h2 id="movie-title">' + movie.title + ' (' + movie.year + ')</h2>' +
-    '<p id="movie-blurb" >' + movie.overview + '</p>' +
+    '<button id="hide-summary" onclick="toggleVisibility(\'movie-blurb\');">show/hide summary</button>'+
+    '<p id="movie-blurb" style="display: none;">' + movie.overview + '</p>' +
     '<iframe width="751" height="422"' +
       'src=' + '"https://www.youtube.com/embed/' + movie.youTubeTrailerId + '"' +
       'frameborder="0"' +
