@@ -42,9 +42,20 @@ function pickMovie() {
     movies = shuffle(movies);
   }
 
-  // TODO: validate movie according to schema before injecting
-  injectMovie(movies[cursor],
+  ajv = new Ajv();
+  var valid = ajv.validate(movieSchema, movies[cursor]);
+  console.log(ajv.errors);
+  
+  if(movies.length < 0) {
+  injectMovie(null,
     'No movies available. Your radarr list might be empty, or the server erroneously gave me an empty list.');
+  } else if(!valid) {
+    injectMovie(null,
+    'Movie object returned doesn\'t match the schema I expect. Peep the console for details.');
+  }
+  else {
+    injectMovie(movies[cursor]);
+  }
   cursor++;
   localStorage.setItem('cursor', JSON.stringify(cursor));
 }
