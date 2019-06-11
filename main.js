@@ -18,7 +18,8 @@ function shuffle(arr) {
 }
 
 function movieToHtml(movie) {
-  return ('<img id="movie-poster" src="' + movie.images[0].url + '"' +
+
+  return ('<img id="movie-poster" src="' + movie.poster_src + '"' +
       'alt="Poster for ' + movie.title + ' (' + movie.year + ')" height="250" width="167"/>' +
     '<h2 id="movie-title">' + movie.title + ' (' + movie.year + ')</h2>' +
     '<button id="hide-summary" onclick="toggleVisibility(\'movie-blurb\');">show/hide summary</button>'+
@@ -43,7 +44,17 @@ function loadMovies(existingMovies, cursor) {
     watchedMovies = (existingMovies && cursor>0) ? existingMovies.slice(0, cursor) : [];
     movies = request.response;
     if(movies && movies.length > 0) {
-      movies = movies.filter(movie => movie.downloaded && movie.hasFile);
+      movies = movies
+        .filter(movie => movie.downloaded && movie.hasFile)
+        .map(movie => ({
+          id: movie.id,
+          title: movie.title,
+          year: movie.year,
+          overview: movie.overview,
+          poster_src: movie.images[0].url,
+          youTubeTrailerId: movie.youTubeTrailerId
+        }));
+        console.log(movies);
       for(let i=0;i<watchedMovies.length;i++) {
         let ind = movies.findIndex(movie => movie.id===watchedMovies[i].id);
         if(ind === -1) {
@@ -92,5 +103,5 @@ function pickMovie() {
 
 var movies = localStorage.getItem('movies') ? JSON.parse(localStorage.getItem('movies')) : [];
 var cursor = (movies && localStorage.getItem('cursor')) ? JSON.parse(localStorage.getItem('cursor')) : 0;
-pickMovie();
+loadMovies(movies, cursor);
 document.getElementById('movie-pick').onclick = pickMovie;
