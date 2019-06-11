@@ -7,11 +7,18 @@ function toggleVisibility(id) {
   }
 }
 
-function injectMovie(movie, errorText) {
-  var movieDiv = document.getElementById('movie-info');
+function shuffle(arr) {
+  for(i=arr.length-1; i>=0; i--) {
+    j = Math.floor(Math.random() * (arr.length));
+    temp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = temp;
+  }
+  return arr;
+}
 
-  var newHtml = (movie) ?
-    '<img id="movie-poster" src="' + movie.images[0].url + '"' +
+function movieToHtml(movie) {
+  return ('<img id="movie-poster" src="' + movie.images[0].url + '"' +
       'alt="Poster for ' + movie.title + ' (' + movie.year + ')" height="250" width="167"/>' +
     '<h2 id="movie-title">' + movie.title + ' (' + movie.year + ')</h2>' +
     '<button id="hide-summary" onclick="toggleVisibility(\'movie-blurb\');">show/hide summary</button>'+
@@ -20,75 +27,25 @@ function injectMovie(movie, errorText) {
       'src=' + '"https://www.youtube.com/embed/' + movie.youTubeTrailerId + '"' +
       'frameborder="0"' +
       'allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen>' +
-    '</iframe>'
-  : '<p>'+errorText+'</p>';
+    '</iframe>');
+}
+
+function injectMovie(newHtml) {
+  var movieDiv = document.getElementById('movie-info');
   movieDiv.innerHTML = newHtml;
 }
 
-function shuffle(arr) {
-  for(i=arr.length-1; i>=0; i--) {
-    j = Math.floor(Math.random() * (arr.length));
-
-    temp = arr[i];
-    arr[i] = arr[j];
-    arr[j] = temp;
-  }
-  return arr;
-}
-
-function pickMovie() {
-  if(cursor >= movies.length) {
-    cursor = 0;
-    movies = shuffle(movies);
-  }
-
-  ajv = new Ajv();
-  var valid = ajv.validate(movieSchema, movies[cursor]);
-  console.log(ajv.errors);
-  
-  if(movies.length < 0) {
-  injectMovie(null,
-    'No movies available. Your radarr list might be empty, or the server erroneously gave me an empty list.');
-  } else if(!valid) {
-    injectMovie(null,
-    'Movie object returned doesn\'t match the schema I expect. Peep the console for details.');
-  }
-  else {
-    injectMovie(movies[cursor]);
-  }
-  cursor++;
-  localStorage.setItem('cursor', JSON.stringify(cursor));
-}
-
-function setup(movies) {
-  pickMovie();
-  document.getElementById('movie-pick').onclick = pickMovie;
-}
-
-var movies = JSON.parse(localStorage.getItem('movies'));
-var cursor = (movies && localStorage.getItem('cursor')) ? JSON.parse(localStorage.getItem('cursor')) : 0;
-
-var needsSetup = true;
-if(movies) {
-  setup(movies);
-  needsSetup=false;
-}
-
-var request = new XMLHttpRequest();
-request.open('GET', requestUrl);
-
-request.responseType = 'json';
-request.send();
-
-request.onload = function() {
-  watchedMovies = (movies && cursor>0) ? movies.slice(0, cursor) : null;
-
-  movies = request.response;
-  if(movies){
-    movies = movies.filter(movie => movie.downloaded && movie.hasFile);
-    if(watchedMovies) {
-      for(i=0;i<watchedMovies.length;i++) {
-        ind = movies.findIndex(movie => movie.id===watchedMovies[i].id);
+function loadMovies(existingMovies, cursor) {
+  var request = new XMLHttpRequest();
+  request.open('GET', requestUrl);
+  request.responseType = 'json';
+  request.onload = function() {
+    watchedMovies = (existingMovies && cursor>0) ? existingMovies.slice(0, cursor) : [];
+    movies = request.response;
+    if(movies && movies.length > 0) {
+      movies = movies.filter(movie => movie.downloaded && movie.hasFile);
+      for(let i=0;i<watchedMovies.length;i++) {
+        let ind = movies.findIndex(movie => movie.id===watchedMovies[i].id);
         if(ind === -1) {
           watchedMovies.splice(i, 1);
           i--;
@@ -96,16 +53,44 @@ request.onload = function() {
           movies.splice(ind, 1);
         }
       }
-    }
-    movies = shuffle(movies);
+      movies = shuffle(movies);
 
-    if(watchedMovies) { movies = watchedMovies.concat(movies); }
-    localStorage.setItem('movies', JSON.stringify(movies));
-    if(needsSetup) {
-      setup(movies);
-      needsSetup=false;
+      movies = watchedMovies.concat(movies);
+      localStorage.setItem('movies', JSON.stringify(movies));
+      localStorage.setItem('cursor', JSON.stringify(cursor));
+      pickMovie();
+    } else {
+      console.log(movies);
+      injectMovie('<p>No movies available; your radarr list might be empty.</p>');
     }
-  } else {
-    injectMovie(null, 'No movies available. This might be a server issue; I got ' +request.status + ' ' + request.statusText + '. Try refreshing the page.');
+  };
+
+  request.onerror = function(e) {
+    console.error(request.statusText);
+    injectMovie('<p>No movies available; server error.</p>');
+  };
+
+  request.send();
+}
+
+function pickMovie() {
+  if(movies.length <= 0) {
+    cursor = 0;
+    injectMovie('<p>...loading movies</p>');
+    loadMovies(movies, cursor);
+    return;
   }
-};
+
+  if(cursor >= movies.length) {
+    cursor = 0;
+    movies = shuffle(movies);
+  }
+  injectMovie(movieToHtml(movies[cursor]));
+  cursor++;
+  localStorage.setItem('cursor', JSON.stringify(cursor));
+}
+
+var movies = localStorage.getItem('movies') ? JSON.parse(localStorage.getItem('movies')) : [];
+var cursor = (movies && localStorage.getItem('cursor')) ? JSON.parse(localStorage.getItem('cursor')) : 0;
+pickMovie();
+document.getElementById('movie-pick').onclick = pickMovie;
